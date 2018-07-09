@@ -1,17 +1,24 @@
-const processPayments = require("../src/main");
-const generateQueue = require("../src/queueService");
-const { makePayment, refundPayment } = require("../src/paymentService");
+const makePayment = jest.fn()
+const refundPayment = jest.fn()
+const mockQueueService = jest.fn()
 
-jest.mock('../src/queueService', () => {
-  return jest.fn(() => [-1, 0, 1]); // have to nest the factory func in a jest.fn if we wanna use it in assertions
-})
-
-jest.mock('../src/paymentService', () => {
+jest.doMock('../src/paymentService.js', () => {
   return {
-    makePayment: jest.fn(() => {console.log("mock pay")}),
-    refundPayment: jest.fn(() => {console.log("mock refund")}),
+    makePayment: makePayment,
+    refundPayment: refundPayment,
   }
-});
+})
+jest.doMock('../src/queueService.js', () => {
+  return mockQueueService
+})
+const processPayments = require("../src/main");
+
+// Need to clear to reset the count for number of times fn is called
+beforeEach(() => {
+  makePayment.mockClear()
+  refundPayment.mockClear()
+  mockQueueService.mockClear()
+})
 
 
 // generateQueue.mockImplementation(() => [-1, 0, 1]);
@@ -20,14 +27,21 @@ jest.mock('../src/paymentService', () => {
 
 
 test("processPayments should call generateQueue once and call makePayment and refundPayment for the correct number of times accordingly", () => {
+  mockQueueService.mockReturnValue([-1, 0, 1]);
+
   processPayments();
 
-  // test that generateQueue is called once
-  expect(generateQueue).toHaveBeenCalledTimes(1);
-
-  // test that makePayment is called for num of +ve times
+  expect(mockQueueService).toHaveBeenCalledTimes(1);
   expect(makePayment).toHaveBeenCalledTimes(2);
-
-  // test that refundPayment is called for num of -ve times
   expect(refundPayment).toHaveBeenCalledTimes(1);
+});
+
+test("processPayments should not call makePayment and refundPayment if generated queue is empty", () => {
+  mockQueueService.mockReturnValue([]);
+
+  processPayments();
+
+  expect(mockQueueService).toHaveBeenCalledTimes(1);
+  expect(makePayment).not.toHaveBeenCalled();
+  expect(refundPayment).not.toHaveBeenCalled();
 });
